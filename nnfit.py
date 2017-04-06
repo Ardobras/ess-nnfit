@@ -54,7 +54,6 @@ def runNN(train_set, test_set, learning_rate=0.00001, layers=(50,110,4), cost_ad
     # Prepare Result Containers
     accuracy_total = []
     cost_total = []
-    average_cost_total = []
 
     # Start Session
     with tf.Session() as sess:
@@ -63,34 +62,38 @@ def runNN(train_set, test_set, learning_rate=0.00001, layers=(50,110,4), cost_ad
         avg_cost = 0.
         this_cost = 0.
 
-        # Training cycle
+        # Training Cycle
         for i in range(len(train_set)):
 
-
+        	# Split Data
             X_data, Y_data = train_set[i]
 
+            # Run Optimization Once
             _, c, out, tobe = sess.run([optimizer, cost, pred, y], feed_dict={x: X_data, y: Y_data})
 
-            avg_cost += c / n_samples
-
+            # Save Cost, Label and Predictions
             cost_total.append([c, out, tobe])
-            average_cost_total.append(avg_cost)
 
 
         print("Training Finished!")
 
-        # Test model
-        correct_prediction = tf.divide(tf.subtract(pred, y), y)
-        log_prediction = tf.divide(tf.subtract(tf.pow(tf.cast(10.0,"float"), pred), tf.pow(tf.cast(10.0,"float"), y)), tf.pow(tf.cast(10.0,"float"),y))
-        # Calculate accuracy
-        accuracy = tf.cast(correct_prediction, "float")
+        # Create Relative Error Function
+        log_prediction = tf.divide(tf.subtract(pred, y), y)
+        correct_prediction = tf.divide(tf.subtract(tf.pow(tf.cast(10.0,"float"), pred), tf.pow(tf.cast(10.0,"float"), y)), tf.pow(tf.cast(10.0,"float"),y))
+        # Cast to Float
         accuracy_log = tf.cast(log_prediction, "float")
+        accuracy = tf.cast(correct_prediction, "float")
+        # Test Cycle
         for t in range(len(test_set)):
+        	# Split Data
             X_data, Y_data = test_set[t]
-            accuracy_total.append(sess.run([accuracy, accuracy_log, pred, y, cost], feed_dict=({x: X_data, y: Y_data})))
+            # Calculate Cost for Test Set
+            accuracy_total.append(sess.run([accuracy_log, accuracy, pred, y, cost], feed_dict=({x: X_data, y: Y_data})))
         
+        # Dismiss session and free memory
         sess.close()
     
+    # Cast to Numpy Arrays
     cost_total = np.array(cost_total)
     accuracy_total = np.array(accuracy_total)
     
@@ -98,6 +101,8 @@ def runNN(train_set, test_set, learning_rate=0.00001, layers=(50,110,4), cost_ad
 
 def load_data_file(filename='W5-reduced.txt'):
     print("Loading Data File")
+
+    # Predefined Variables
     names = ['z','theta','lambda','time','wx','wz','val']
     dorg = pd.read_csv(filename, header=0, names=names, delimiter=' ')
 
@@ -108,13 +113,16 @@ def load_data_file(filename='W5-reduced.txt'):
 
 def prepareDataSet(df, length=10000):
     print("Generating CV Sets")
+    # Pandas to numpy
     m = df.as_matrix()
+    # Cast to Float
     m = np.array([np.array(x, dtype=np.float32) for x in m])
+    # Shuffle
     np.random.shuffle(m)
-    #s = s[:length]
-    #s = pd.DataFrame(s)
     data = []
+    # Create Data Set
     for i in range(length):
+    	# Split in Input and Label
         X_data = np.array([m[i][0:6]], dtype=np.float32)
         Y_data = [[m[i][6]]]
         data.append([X_data, Y_data]);
@@ -123,24 +131,30 @@ def prepareDataSet(df, length=10000):
 
 
 def run_eval(cv=20):
-
+	# Load Data File
     d = load_data_file()
 
+    # Calculate Length
     length = len(d)
     
+    # Create CV Data Sets
     all_data_shuffle = [prepareDataSet(d, length) for _ in range(cv)]
     
+    # Split in Training and Test
     splitpoint = int(length*0.8)
     train_d = [d[:splitpoint] for d in all_data_shuffle]
     test_d = [d[splitpoint:] for d in all_data_shuffle]
     
+    # Start CV
     print("Starting Loop")
     acc = []
     cos = []
     for i in range(cv):
-    
+    	
+    	# Run Neural Network
         cost_train, accuracy_test = runNN(train_d[i], test_d[i])
     
+    	# Append Results of this Network
         cost_train = np.array(cost_train)
         cos.append(cost_train)
         accuracy_test = np.array(accuracy_test)
@@ -188,7 +202,7 @@ def pretty_print_all(cos, acc):
                         wspace=0.3)
     plt.show()
 
-    # histogram of accuracy without log
+    # histogram of predictions with log
     limit = 1000
     err = np.array([item[2] for x in acc for item in x])
     err = err[np.where((err > -1 * limit) & (err < limit))]
@@ -197,7 +211,7 @@ def pretty_print_all(cos, acc):
     plt.title('Histogram of predictions with logarithmic values')
     plt.show()
 
-    # histogram of accuracy without log
+    # histogram of labels with log
     limit = 1000
     err = np.array([item[3] for x in acc for item in x])
     err = err[np.where((err > -1 * limit) & (err < limit))]
@@ -207,46 +221,52 @@ def pretty_print_all(cos, acc):
     plt.show()
 
 def pretty_print_single(acc, cos, i):
+	# Get Data from Selected Network
     cost_total = cos[i]
     accuracy_total = acc[i]
 
+    # Print some Averages
     print('Average Cost')
     print(np.average(accuracy_total[:,0]))
     print('Variance of Cost')
     print(np.std(accuracy_total[:,0]))
 
+    # histogram of accuracy with log of test set
     plt.hist(accuracy_total[:,0], range=(-15,15), bins=100)
     plt.title('TEST_ACCURACY_LOGARITHMIC (-15 to 15)')
     plt.show()
 
-    #plt.hist(accuracy_total[:,2], range=(-100,100), bins=40)
-    #plt.hist(accuracy_total[:,1], range=(-100,100), bins=40)
-
+    # histogram of accuracy without log of test set
     plt.hist(accuracy_total[:,1], range=(-15,15), bins=100)
     plt.title('TEST_ACCURACY_ORIGINAL (-15 to 15)')
     plt.show()
 
+    # scatter of predictions with log of test set
     plt.scatter(range(len(accuracy_total)), accuracy_total[:,2])
     plt.title('TEST_PREDICTIONS_LOGARITHMIC')
     plt.show()
 
+    # scatter of labels with log of test set
     plt.scatter(range(len(accuracy_total)), accuracy_total[:,3])
     plt.title('TEST_LABEL_LOGARITHMIC')
     plt.show()
 
+    # plot of train cost development
     plt.plot(cost_total[:,0])
     plt.title('TRAIN_COST')
     plt.show()
 
+    # plot of train predictions
     plt.plot(cost_total[:,1])
     plt.title('TRAIN_PREDICTION')
     plt.ylim((0, 25))
     plt.show()
 
+    # plot of train labels
     plt.plot(cost_total[:,2])
     plt.title('TRAIN_LABEL')
     plt.show()
 
-
+# Run Everything
 cos, acc = run_eval(cv=2)
 pretty_print_all(cos, acc)
